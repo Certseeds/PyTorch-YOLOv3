@@ -1,13 +1,11 @@
 from __future__ import division
 
-from models import *
+from models.models import *
 from utils.utils import *
 from utils.datasets import *
-from utils.augmentations import *
 from utils.transforms import *
 
 import os
-import sys
 import time
 import datetime
 import argparse
@@ -17,12 +15,21 @@ from PIL import Image
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from torchvision import datasets
 from torch.autograd import Variable
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import NullLocator
+
+
+def builds(opt):
+    os.makedirs("output", exist_ok=True)
+    opt.output_save_path = increment_path(Path("output") / opt.name, exist_ok=opt.exist_ok | opt.evolve)
+    opt.save_dir = Path(opt.output_save_path)
+    opt.save_dir.mkdir(parents=True, exist_ok=True)
+    opt.label_dir = opt.save_dir / "labels"
+    opt.label_dir.mkdir(parents=True, exist_ok=True)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -33,15 +40,20 @@ if __name__ == "__main__":
     parser.add_argument("--conf_thres", type=float, default=0.8, help="object confidence threshold")
     parser.add_argument("--nms_thres", type=float, default=0.4, help="iou thresshold for non-maximum suppression")
     parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
-    parser.add_argument("--n_cpu", type=int, default=0, help="number of cpu threads to use during batch generation")
+    parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
     parser.add_argument("--checkpoint_model", type=str, help="path to checkpoint model")
+
+    parser.add_argument('--name', default='exp', help='save to project/name')
+    parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
+    parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+
     opt = parser.parse_args()
     print(opt)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    os.makedirs("output", exist_ok=True)
+    builds(opt)
 
     # Set up model
     model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
@@ -71,8 +83,8 @@ if __name__ == "__main__":
     img_detections = []  # Stores detections for each image index
 
     print("\nPerforming object detection:")
-    prev_time = time.time()
     for batch_i, (img_paths, input_imgs) in enumerate(dataloader):
+        prev_time = time.time()
         # Configure input
         input_imgs = Variable(input_imgs.type(Tensor))
 
@@ -84,9 +96,8 @@ if __name__ == "__main__":
         # Log progress
         current_time = time.time()
         inference_time = datetime.timedelta(seconds=current_time - prev_time)
-        prev_time = current_time
         print("\t+ Batch %d, Inference Time: %s" % (batch_i, inference_time))
-
+        print("\t+ picture {}, interface time: {}".format(img_paths, inference_time))
         # Save image and detections
         imgs.extend(img_paths)
         img_detections.extend(detections)
@@ -106,6 +117,7 @@ if __name__ == "__main__":
         plt.figure()
         fig, ax = plt.subplots(1)
         ax.imshow(img)
+        filename = os.path.basename(path).split(".")[0]
 
         # Draw bounding boxes and labels of detections
         if detections is not None:
@@ -115,7 +127,6 @@ if __name__ == "__main__":
             n_cls_preds = len(unique_labels)
             bbox_colors = random.sample(colors, n_cls_preds)
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-
                 print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
 
                 box_w = x2 - x1
@@ -135,12 +146,16 @@ if __name__ == "__main__":
                     verticalalignment="top",
                     bbox={"color": color, "pad": 0},
                 )
-
+                with open(opt.label_dir / f"{filename}.txt", 'w') as result_txt:
+                    result_txt.write(f"0 {x1} {x2} {y1} {y2}")
+        else:
+            emptyfile = opt.label_dir / f"{filename}.txt"
+            emptyfile.touch()
         # Save generated image with detections
         plt.axis("off")
         plt.gca().xaxis.set_major_locator(NullLocator())
         plt.gca().yaxis.set_major_locator(NullLocator())
-        filename = os.path.basename(path).split(".")[0]
-        output_path = os.path.join("output", f"{filename}.png")
+
+        output_path = os.path.join(opt.output_save_path, f"{filename}.png")
         plt.savefig(output_path, bbox_inches="tight", pad_inches=0.0)
         plt.close()

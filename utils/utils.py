@@ -1,6 +1,11 @@
 from __future__ import division
+
+import glob
 import math
+import re
 import time
+from pathlib import Path
+
 import tqdm
 import torch
 import torch.nn as nn
@@ -19,8 +24,8 @@ def load_classes(path):
     """
     Loads class labels at 'path'
     """
-    fp = open(path, "r")
-    names = fp.read().split("\n")[:-1]
+    with open(path, "r") as fp:
+        names = [x.replace("\n", "") for x in fp.readlines()]
     return names
 
 
@@ -35,6 +40,10 @@ def weights_init_normal(m):
 
 def rescale_boxes(boxes, current_dim, original_shape):
     """ Rescales bounding boxes to the original shape """
+    # boxes's shape is tensor[[7]],
+    # x1, y1, x2, y2, conf, cls_conf, cls_pred
+    # 压缩过程就是把等比例的最大的压缩到current_dim,
+    # 然后给小边两边补充pad
     orig_h, orig_w = original_shape
     # The amount of padding that was added
     pad_x = max(orig_h - orig_w, 0) * (current_dim / max(original_shape))
@@ -273,8 +282,20 @@ def non_max_suppression(prediction, conf_thres=0.5, nms_thres=0.4):
     return output
 
 
-def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
+def increment_path(path, exist_ok=True, sep=''):
+    # Increment path, i.e. runs/exp --> runs/exp{sep}0, runs/exp{sep}1 etc.
+    path = Path(path)  # os-agnostic
+    if (path.exists() and exist_ok) or (not path.exists()):
+        return str(path)
+    else:
+        dirs = glob.glob(f"{path}{sep}*")  # similar paths
+        matches = [re.search(rf"%s{sep}(\d+)" % path.stem, d) for d in dirs]
+        i = [int(m.groups()[0]) for m in matches if m]  # indices
+        n = max(i) + 1 if i else 2  # increment number
+        return f"{path}{sep}{n}"  # update path
 
+
+def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
     BoolTensor = torch.cuda.BoolTensor if pred_boxes.is_cuda else torch.BoolTensor
     FloatTensor = torch.cuda.FloatTensor if pred_boxes.is_cuda else torch.FloatTensor
 
