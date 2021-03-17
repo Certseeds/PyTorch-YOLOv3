@@ -35,7 +35,7 @@ def builds(opt):
     opt.label_dir.mkdir(parents=True, exist_ok=True)
 
 
-if __name__ == "__main__":
+def init_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
     parser.add_argument("--imglist_file", type=str, help="file that store img_file_list")
@@ -48,21 +48,14 @@ if __name__ == "__main__":
     parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
     parser.add_argument("--img_size", type=int, default=416, help="size of each image dimension")
     parser.add_argument("--checkpoint_model", type=str, help="path to checkpoint model")
-
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-
     opt = parser.parse_args()
-    print(opt)
+    return opt
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    builds(opt)
-
-    # Set up model
-    model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
-
+def load_model(opt, model) -> None:
     if opt.weights_path.endswith(".weights"):
         # Load darknet weights
         model.load_darknet_weights(opt.weights_path)
@@ -70,7 +63,8 @@ if __name__ == "__main__":
         # Load checkpoint weights
         model.load_state_dict(torch.load(opt.weights_path))
 
-    model.eval()  # Set in evaluation mode
+
+def load_dataloader(opt):
     if opt.imglist_file is not None:
         dataset = ImageList(opt.imglist_file, transform= \
             transforms.Compose([DEFAULT_TRANSFORMS, Resize(opt.img_size)]))
@@ -83,6 +77,30 @@ if __name__ == "__main__":
                             shuffle=False,
                             num_workers=opt.n_cpu,
                             )
+    return dataloader
+
+
+if __name__ == "__main__":
+    opt = init_parser()
+    print(opt)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    builds(opt)
+
+    # Set up model
+    model = Darknet(opt.model_def, img_size=opt.img_size).to(device)
+    load_model(opt, model)
+    # if opt.weights_path.endswith(".weights"):
+    #     # Load darknet weights
+    #     model.load_darknet_weights(opt.weights_path)
+    # else:
+    #     # Load checkpoint weights
+    #     model.load_state_dict(torch.load(opt.weights_path))
+
+    model.eval()  # Set in evaluation mode
+
+    dataloader = load_dataloader(opt)
 
     classes = load_classes(opt.class_path)  # Extracts class labels from file
 
@@ -122,24 +140,21 @@ if __name__ == "__main__":
 
         # Create plot
         img = cv2.imread(path)
-        cv2.imshow(path, img)
-        filename = PurePath(path).name.split(".")[0]
+        # cv2.imshow(path, img)
+        filename = PurePath(path).stem
 
         # Draw bounding boxes and labels of detections
         if detections is not None:
             # Rescale boxes to original image
-            detections = rescale_boxes(detections, opt.img_size, (img.shape[1], img.shape[0]))
+            detections = rescale_boxes(detections, opt.img_size, img.shape[:2])
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
-            bbox_colors = random.sample(colors, n_cls_preds)
-            for y1, x1, y2, x2, conf, cls_conf, cls_pred in detections:
+            # bbox_colors = random.sample(colors, n_cls_preds)
+            for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
                 print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
                 x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
                 box_w, box_h = x2 - x1, y2 - y1
-                color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
-                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
-                cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_COMPLEX_SMALL, 6,
-                            (0, 0, 255), 10)
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 6)
                 with open(opt.label_dir / f"{filename}.txt", 'a') as result_txt:
                     x_middle, y_middle = min(1, (x1 + x2) / 2 / img.shape[1]), min(1, (y1 + y2) / 2 / img.shape[0])
                     x_length, y_length = box_w / img.shape[1], box_h / img.shape[0]

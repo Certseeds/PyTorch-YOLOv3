@@ -51,12 +51,16 @@ def rescale_boxes(boxes, current_dim, original_shape):
     # Image height and width after padding is removed
     unpad_h = current_dim - pad_y
     unpad_w = current_dim - pad_x
-    # Rescale bounding boxes to dimension of original image
-    boxes[:, 0] = ((boxes[:, 0] - pad_x // 2) / unpad_w) * orig_w
-    boxes[:, 1] = ((boxes[:, 1] - pad_y // 2) / unpad_h) * orig_h
-    boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
-    boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
-    return boxes
+    new_box = boxes.clone()
+    for i in range(0, 2, 1):
+        new_box[:, 2 * i] = ((boxes[:, 2 * i] - pad_x // 2) / unpad_w) * orig_w
+        new_box[:, 2 * i + 1] = ((boxes[:, 2 * i + 1] - pad_y // 2) / unpad_h) * orig_h
+        # Rescale bounding boxes to dimension of original image
+        # boxes[:, 0] = ((boxes[:, 0] - pad_x // 2) / unpad_w) * orig_w
+        # boxes[:, 1] = ((boxes[:, 1] - pad_y // 2) / unpad_h) * orig_h
+        # boxes[:, 2] = ((boxes[:, 2] - pad_x // 2) / unpad_w) * orig_w
+        # boxes[:, 3] = ((boxes[:, 3] - pad_y // 2) / unpad_h) * orig_h
+    return new_box
 
 
 def xywh2xyxy(x):
