@@ -9,9 +9,9 @@ import torch.nn.functional as F
 class expandLayer(nn.Module):
     def __init__(self):
         super(expandLayer, self).__init__()
-        self.kernel1 = torch.FloatTensor([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]).reshape(1, 1, 3, 3)
-        self.kernel2 = torch.FloatTensor([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]).reshape(1, 1, 3, 3)
-        self.empty = torch.FloatTensor([[0, 0, 0], [0, 1, 0], [0, 0, 0]]).reshape(1, 1, 3, 3)
+        self.kernel1 = torch.cuda.FloatTensor([[-3, -10, -3], [0, 0, 0], [3, 10, 3]]).reshape(1, 1, 3, 3)
+        self.kernel2 = torch.cuda.FloatTensor([[-3, 0, 3], [-10, 0, 10], [-3, 0, 3]]).reshape(1, 1, 3, 3)
+        self.empty = torch.cuda.FloatTensor([[0, 0, 0], [0, 1, 0], [0, 0, 0]]).reshape(1, 1, 3, 3)
         self.weights = nn.Parameter(data=torch.cat((self.kernel1, self.kernel2, self.empty), 0), requires_grad=False)
 
     def forward(self, x):
