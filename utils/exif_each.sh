@@ -16,12 +16,12 @@ clear_path(){
     done
 }
 main(){
-    path_array[0]="BarcodeDatasets/images/Dataset1"
-    path_array[1]="BarcodeDatasets/images/Dataset2"
-    path_array[2]="1d_barcode_extended_plain/images/Original"
-    path_array[3]="1d_barcode_extended/images/JPEGImages"
-    path_array[4]="pictures/images/20210316_2"
-    path_array[5]="pictures/images/20210317_2"
+    #path_array[0]="BarcodeDatasets/images/Dataset1"
+    #path_array[1]="BarcodeDatasets/images/Dataset2"
+    #path_array[2]="1d_barcode_extended_plain/images/Original"
+    #path_array[3]="1d_barcode_extended/images/JPEGImages"
+    path_array[0]="pictures/images/20210316_2"
+    #path_array[5]="pictures/images/20210317_2"
     for i in ${path_array[@]}; do
         echo ${pre_path}${i}
     done

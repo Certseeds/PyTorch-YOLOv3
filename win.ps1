@@ -43,7 +43,6 @@ $script = {
             --batch_size 8 `
             --verbose
         # --pretrained_weights checkpoints/yolov3_ckpt_87.pth
-
     }
     Write-Output("zaima")
     Write-Output($method)
