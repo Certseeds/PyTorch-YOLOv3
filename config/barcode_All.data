@@ -1,0 +1,4 @@
+classes=1
+train=data/barcode_All/train.txt
+valid=data/barcode_All/valid.txt
+names=data/barcode_All/classes.names

@@ -62,13 +62,38 @@ class ImageFolder(Dataset):
         return len(self.files)
 
 
+class ImageList(Dataset):
+    def __init__(self, list_path, transform=None):
+        with open(list_path, "r") as file:
+            self.img_files = file.readlines()
+            self.img_files = [path.replace("\n", "") for path in self.img_files]
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.img_files)
+
+    def __getitem__(self, index):
+        img_path = self.img_files[index % len(self.img_files)]
+        img = np.array(Image.open(img_path).convert('RGB'), dtype=np.uint8)
+
+        # Apply transforms
+        if self.transform:
+            boxes = np.zeros((1, 5))
+            img, _ = self.transform((img, boxes))
+
+        return img_path, img
+
+
 class ListDataset(Dataset):
     def __init__(self, list_path, img_size=416, multiscale=True, transform=None):
         with open(list_path, "r") as file:
             self.img_files = file.readlines()
 
         self.label_files = [
-            path.replace("images", "labels").replace(".png", ".txt").replace(".jpg", ".txt")
+            path.replace("images", "labels")
+                .replace(".png", ".txt")
+                .replace(".jpg", ".txt")
+                .replace(".JPG", ".txt")
             for path in self.img_files
         ]
 

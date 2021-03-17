@@ -1,5 +1,9 @@
 from __future__ import division
 
+from pathlib import PurePath
+
+import cv2
+
 from models.models import *
 from utils.utils import *
 from utils.datasets import *
@@ -17,8 +21,8 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+# import matplotlib.pyplot as plt
+# import matplotlib.patches as patches
 from matplotlib.ticker import NullLocator
 
 
@@ -34,6 +38,7 @@ def builds(opt):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--image_folder", type=str, default="data/samples", help="path to dataset")
+    parser.add_argument("--imglist_file", type=str, help="file that store img_file_list")
     parser.add_argument("--model_def", type=str, default="config/yolov3.cfg", help="path to model definition file")
     parser.add_argument("--weights_path", type=str, default="weights/yolov3.weights", help="path to weights file")
     parser.add_argument("--class_path", type=str, default="data/coco.names", help="path to class label file")
@@ -66,14 +71,18 @@ if __name__ == "__main__":
         model.load_state_dict(torch.load(opt.weights_path))
 
     model.eval()  # Set in evaluation mode
+    if opt.imglist_file is not None:
+        dataset = ImageList(opt.imglist_file, transform= \
+            transforms.Compose([DEFAULT_TRANSFORMS, Resize(opt.img_size)]))
+    else:
+        dataset = ImageFolder(opt.image_folder, transform= \
+            transforms.Compose([DEFAULT_TRANSFORMS, Resize(opt.img_size)]))
 
-    dataloader = DataLoader(
-        ImageFolder(opt.image_folder, transform= \
-            transforms.Compose([DEFAULT_TRANSFORMS, Resize(opt.img_size)])),
-        batch_size=opt.batch_size,
-        shuffle=False,
-        num_workers=opt.n_cpu,
-    )
+    dataloader = DataLoader(dataset,
+                            batch_size=opt.batch_size,
+                            shuffle=False,
+                            num_workers=opt.n_cpu,
+                            )
 
     classes = load_classes(opt.class_path)  # Extracts class labels from file
 
@@ -103,9 +112,8 @@ if __name__ == "__main__":
         img_detections.extend(detections)
 
     # Bounding-box colors
-    cmap = plt.get_cmap("tab20b")
-    colors = [cmap(i) for i in np.linspace(0, 1, 20)]
-
+    # cmap = plt.get_cmap("tab20b")
+    # colors = [cmap(i) for i in np.linspace(0, 1, 20)]
     print("\nSaving images:")
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
@@ -113,49 +121,33 @@ if __name__ == "__main__":
         print("(%d) Image: '%s'" % (img_i, path))
 
         # Create plot
-        img = np.array(Image.open(path))
-        plt.figure()
-        fig, ax = plt.subplots(1)
-        ax.imshow(img)
-        filename = os.path.basename(path).split(".")[0]
+        img = cv2.imread(path)
+        cv2.imshow(path, img)
+        filename = PurePath(path).name.split(".")[0]
 
         # Draw bounding boxes and labels of detections
         if detections is not None:
             # Rescale boxes to original image
-            detections = rescale_boxes(detections, opt.img_size, img.shape[:2])
+            detections = rescale_boxes(detections, opt.img_size, (img.shape[1], img.shape[0]))
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
             bbox_colors = random.sample(colors, n_cls_preds)
-            for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
+            for y1, x1, y2, x2, conf, cls_conf, cls_pred in detections:
                 print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
-
-                box_w = x2 - x1
-                box_h = y2 - y1
-
+                x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
+                box_w, box_h = x2 - x1, y2 - y1
                 color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
-                # Create a Rectangle patch
-                bbox = patches.Rectangle((x1, y1), box_w, box_h, linewidth=2, edgecolor=color, facecolor="none")
-                # Add the bbox to the plot
-                ax.add_patch(bbox)
-                # Add label
-                plt.text(
-                    x1,
-                    y1,
-                    s=classes[int(cls_pred)],
-                    color="white",
-                    verticalalignment="top",
-                    bbox={"color": color, "pad": 0},
-                )
-                with open(opt.label_dir / f"{filename}.txt", 'w') as result_txt:
-                    result_txt.write(f"0 {x1} {x2} {y1} {y2}")
+                cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                cv2.putText(img, classes[int(cls_pred)], (x1, y1), cv2.FONT_HERSHEY_COMPLEX_SMALL, 6,
+                            (0, 0, 255), 10)
+                with open(opt.label_dir / f"{filename}.txt", 'a') as result_txt:
+                    x_middle, y_middle = min(1, (x1 + x2) / 2 / img.shape[1]), min(1, (y1 + y2) / 2 / img.shape[0])
+                    x_length, y_length = box_w / img.shape[1], box_h / img.shape[0]
+                    result_txt.write(f"0 {x_middle} {y_middle} {x_length} {y_length}\n")
+                    # result_txt.write(f"0 {x1} {x2} {y1} {y2}")
         else:
             emptyfile = opt.label_dir / f"{filename}.txt"
             emptyfile.touch()
         # Save generated image with detections
-        plt.axis("off")
-        plt.gca().xaxis.set_major_locator(NullLocator())
-        plt.gca().yaxis.set_major_locator(NullLocator())
-
-        output_path = os.path.join(opt.output_save_path, f"{filename}.png")
-        plt.savefig(output_path, bbox_inches="tight", pad_inches=0.0)
-        plt.close()
+        output_path = os.path.join(opt.output_save_path, f"{filename}.jpg")
+        cv2.imwrite(output_path, img)
