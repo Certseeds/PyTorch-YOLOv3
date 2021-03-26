@@ -63,7 +63,7 @@ $script = {
         }
     }
     # outputModel
-    #detect
+    detect
     #train_all
     #detect
 }
