@@ -20,7 +20,8 @@ import torch
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-if __name__ == "__main__":
+
+def init_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--epochs", type=int, default=100, help="number of epochs")
     parser.add_argument("--batch_size", type=int, default=8, help="size of each image batch")
@@ -41,8 +42,12 @@ if __name__ == "__main__":
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-
     opt = parser.parse_args()
+    return opt
+
+
+if __name__ == "__main__":
+    opt = init_parser()
     print(opt)
 
     opt.save_dir = increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok | opt.evolve)
@@ -159,7 +164,8 @@ if __name__ == "__main__":
             time_left = datetime.timedelta(seconds=epoch_batches_left * (time.time() - start_time) / (batch_i + 1))
             log_str += f"\n---- ETA {time_left}"
 
-            if opt.verbose: print(log_str)
+            if opt.verbose:
+                print(log_str)
 
             model.seen += imgs.size(0)
 
