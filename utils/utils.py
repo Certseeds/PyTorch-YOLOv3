@@ -5,6 +5,7 @@ import math
 import re
 import time
 from pathlib import Path
+from typing import Tuple
 
 import tqdm
 import torch
@@ -353,3 +354,55 @@ def build_targets(pred_boxes, pred_cls, target, anchors, ignore_thres):
 
     tconf = obj_mask.float()
     return iou_scores, class_mask, obj_mask, noobj_mask, tx, ty, tw, th, tcls, tconf
+
+
+def str2bool(v: str) -> bool:
+    return v.lower() in ("yes", "true", "t", "1")
+
+
+def coco_to_yolo(rect: Tuple[float, float, float, float], shape: Tuple[int, int]) -> Tuple[float, float, float, float]:
+    """
+    Args:
+        rect: (x_min,y_min,x_max,y_max)
+        shape: (x_net_len,h_net_len)
+    Returns:
+        (x_mid,y_mid,x_len,y_len)
+    """
+    # print(f'[x_min,y_min,x_max,y_max] is {rect[0]} {rect[1]} {rect[2]} {rect[3]}')
+    will_return = [-1, -1, -1, -1]
+    will_return[0], will_return[1] = (rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2
+    will_return[2], will_return[3] = (rect[2] - rect[0]), (rect[3] - rect[1])
+    will_return[0], will_return[2] = will_return[0] / shape[0], will_return[2] / shape[0]
+    will_return[1], will_return[3] = will_return[1] / shape[1], will_return[3] / shape[1]
+    # print(f'[x_mid,y_mid,x_len,y_len] is {will_return[0]}, {will_return[1]}, {will_return[2]}, {will_return[3]}')
+    return will_return[0], will_return[1], will_return[2], will_return[3]
+
+
+def coco_to_percent(rect: Tuple[float, float, float, float], shape: Tuple[int, int]) -> Tuple[
+    float, float, float, float]:
+    """
+    Args:
+        rect: (x_min,y_min,x_max,y_max)
+        shape: (x_net_len,h_net_len)
+    Returns:
+        (x_mid,y_mid,x_len,y_len)
+    """
+    # print(f'[x_min,y_min,x_max,y_max] is {rect[0]} {rect[1]} {rect[2]} {rect[3]}')
+    will_return = list(rect)
+    will_return[0], will_return[2] = will_return[0] / shape[0], will_return[2] / shape[0]
+    will_return[1], will_return[3] = will_return[1] / shape[1], will_return[3] / shape[1]
+    # print(f'[x_mid,y_mid,x_len,y_len] is {will_return[0]}, {will_return[1]}, {will_return[2]}, {will_return[3]}')
+    return will_return[0], will_return[1], will_return[2], will_return[3]
+
+
+def yolo_to_coco(rects):
+    """
+    Args:
+        rects: [(x_mid,y_mid,x_len,y_len),...]
+    Returns:
+        [(x_min,y_min,x_max,y_max)]
+    """
+    will_return = []
+    for rect in rects:
+        will_return.append((rect[0] - rect[2] / 2, rect[1] - rect[3] / 2, rect[0] + rect[2] / 2, rect[1] + rect[3] / 2))
+    return will_return
