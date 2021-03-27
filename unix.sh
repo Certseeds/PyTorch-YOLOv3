@@ -6,17 +6,19 @@ set -o pipefail
 function detect() {
   python3 ./detect.py \
     --imglist_file ./data/barcode_All/train.txt \
-    --weights_path ./runs/train/exp13/weights/last.weights \
+    --weights_path ./runs/train/exp16/weights/last.weights \
     --class_path ./data/barcode_All/classes.names \
-    --model_def ./config/yolov3-barcode.cfg
+    --model_def ./config/yolov3-barcode.cfg \
+    --test_or_eval false
   # --image_folder ../barcode_detection_dataset/pictures/images/20210317_2 \
 }
 function detectCorrect() {
   python3 ./detect.py \
     --imglist_file ./data/CorrectDetect.txt \
-    --weights_path ./runs/train/exp14/weights/last.weights \
+    --weights_path ./runs/train/exp16/weights/last.weights \
     --class_path ./data/barcode_All/classes.names \
-    --model_def ./config/yolov3-barcode.cfg
+    --model_def ./config/yolov3-barcode.cfg \
+    --test_or_eval false
   # --image_folder ..\barcode_detection_dataset\pictures\images\20210317_2 \
 }
 function train() {
@@ -30,7 +32,6 @@ function train() {
     --model_def config/yolov3-barcode.cfg \
     --verbose
   # --pretrained_weights checkpoints/yolov3_ckpt_87.pth
-
 }
 function train_all() {
   # one batch for about 450MB GraphCardMemory
@@ -46,11 +47,18 @@ function train_all() {
     --verbose
   # --pretrained_weights checkpoints/yolov3_ckpt_87.pth
 }
+function ap_small() {
+  python3 ./ap_test.py \
+    --img_list_file_path data/CorrectDetect.txt \
+    --pred_label_path output/exp6/labels
+}
+function ap_all() {
+  python3 ./ap_test.py \
+    --img_list_file_path data/barcode_All/train.txt \
+    --pred_label_path output/exp6/labels
+}
 echo "$@"
-for var in "$@" ; do
-  echo "${var}"
-  eval "${var}"
-  exit
-done
+echo "$@"
+"$1"
 # example:
 # run `./unix.sh detectCorrect`

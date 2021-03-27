@@ -51,6 +51,9 @@ def init_parser():
     parser.add_argument('--name', default='exp', help='save to project/name')
     parser.add_argument('--evolve', action='store_true', help='evolve hyperparameters')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+    parser.add_argument("--test_or_eval", default=True, type=str2bool,
+                        help="True: output for test, label format is yolo, "
+                             "False: Output for eval, label format is '0 x_min y_min x_max y_max conf' per line")
     opt = parser.parse_args()
     return opt
 
@@ -150,16 +153,22 @@ if __name__ == "__main__":
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
             # bbox_colors = random.sample(colors, n_cls_preds)
+            result_txt = open(opt.label_dir / f"{filename}.txt", 'a')
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
                 print("\t+ Label: %s, Conf: %.5f" % (classes[int(cls_pred)], cls_conf.item()))
                 x1, x2, y1, y2 = int(x1), int(x2), int(y1), int(y2)
                 box_w, box_h = x2 - x1, y2 - y1
                 cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 0), 6)
-                with open(opt.label_dir / f"{filename}.txt", 'a') as result_txt:
-                    x_middle, y_middle = min(1, (x1 + x2) / 2 / img.shape[1]), min(1, (y1 + y2) / 2 / img.shape[0])
-                    x_length, y_length = box_w / img.shape[1], box_h / img.shape[0]
-                    result_txt.write(f"0 {x_middle} {y_middle} {x_length} {y_length}\n")
-                    # result_txt.write(f"0 {x1} {x2} {y1} {y2}")
+                if opt.test_or_eval:
+                    x_mid, y_mid = min(1, (x1 + x2) / 2 / img.shape[1]), min(1, (y1 + y2) / 2 / img.shape[0])
+                    x_len, y_len = box_w / img.shape[1], box_h / img.shape[0]
+                    result_txt.write(f"0 {x_mid:.6f} {y_mid:.6f} {x_len:.6f} {y_len:.6f}\n")
+                else:
+                    x1, x2 = x1 / img.shape[1], x2 / img.shape[1]
+                    y1, y2 = y1 / img.shape[0], y2 / img.shape[0]
+                    result_txt.write(f"0 {x1:.6f} {y1:.6f} {x2:.6f} {y2:.6f} {conf:.6f}\n")
+            result_txt.close()
+            # result_txt.write(f"0 {x1} {x2} {y1} {y2}")
         else:
             emptyfile = opt.label_dir / f"{filename}.txt"
             emptyfile.touch()
